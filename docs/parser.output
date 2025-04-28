@@ -1,0 +1,317 @@
+Grammar
+
+    0 $accept: lambda $end
+
+    1 lambda: lambda_program
+
+    2 lambda_program: lambda_stmt lambda_program
+    3               | lambda_stmt
+
+    4 lambda_stmt: TT_LET lambda_identifier TT_ASSIGN lambda_expr TT_SEMI
+
+    5 lambda_expr: TT_LAMBDA lambda_identifier_list TT_ARROW lambda_expr
+    6            | lambda_expr_app
+
+    7 lambda_expr_app: lambda_expr_singleton
+    8                | lambda_expr_app lambda_expr_singleton
+
+    9 lambda_expr_singleton: TT_LPAREN lambda_expr TT_RPAREN
+   10                      | lambda_identifier
+
+   11 lambda_identifier_list: lambda_token TT_COMMA lambda_identifier_list
+   12                       | lambda_token
+
+   13 lambda_identifier: lambda_token
+
+   14 lambda_token: TT_IDENTIFIER
+
+
+Terminals, with rules where they appear
+
+    $end (0) 0
+    error (256)
+    TT_LET (258) 4
+    TT_IDENTIFIER (259) 14
+    TT_ASSIGN (260) 4
+    TT_LAMBDA (261) 5
+    TT_COMMA (262) 11
+    TT_ARROW (263) 5
+    TT_LPAREN (264) 9
+    TT_RPAREN (265) 9
+    TT_SEMI (266) 4
+
+
+Nonterminals, with rules where they appear
+
+    $accept (12)
+        on left: 0
+    lambda <ast> (13)
+        on left: 1
+        on right: 0
+    lambda_program <stmt> (14)
+        on left: 2 3
+        on right: 1 2
+    lambda_stmt <stmt> (15)
+        on left: 4
+        on right: 2 3
+    lambda_expr <expr> (16)
+        on left: 5 6
+        on right: 4 5 9
+    lambda_expr_app <expr> (17)
+        on left: 7 8
+        on right: 6 8
+    lambda_expr_singleton <expr> (18)
+        on left: 9 10
+        on right: 7 8
+    lambda_identifier_list <id> (19)
+        on left: 11 12
+        on right: 5 11
+    lambda_identifier <id> (20)
+        on left: 13
+        on right: 4 10
+    lambda_token <token> (21)
+        on left: 14
+        on right: 11 12 13
+
+
+State 0
+
+    0 $accept: • lambda $end
+
+    TT_LET  shift, and go to state 1
+
+    lambda          go to state 2
+    lambda_program  go to state 3
+    lambda_stmt     go to state 4
+
+
+State 1
+
+    4 lambda_stmt: TT_LET • lambda_identifier TT_ASSIGN lambda_expr TT_SEMI
+
+    TT_IDENTIFIER  shift, and go to state 5
+
+    lambda_identifier  go to state 6
+    lambda_token       go to state 7
+
+
+State 2
+
+    0 $accept: lambda • $end
+
+    $end  shift, and go to state 8
+
+
+State 3
+
+    1 lambda: lambda_program •
+
+    $default  reduce using rule 1 (lambda)
+
+
+State 4
+
+    2 lambda_program: lambda_stmt • lambda_program
+    3               | lambda_stmt •
+
+    TT_LET  shift, and go to state 1
+
+    $default  reduce using rule 3 (lambda_program)
+
+    lambda_program  go to state 9
+    lambda_stmt     go to state 4
+
+
+State 5
+
+   14 lambda_token: TT_IDENTIFIER •
+
+    $default  reduce using rule 14 (lambda_token)
+
+
+State 6
+
+    4 lambda_stmt: TT_LET lambda_identifier • TT_ASSIGN lambda_expr TT_SEMI
+
+    TT_ASSIGN  shift, and go to state 10
+
+
+State 7
+
+   13 lambda_identifier: lambda_token •
+
+    $default  reduce using rule 13 (lambda_identifier)
+
+
+State 8
+
+    0 $accept: lambda $end •
+
+    $default  accept
+
+
+State 9
+
+    2 lambda_program: lambda_stmt lambda_program •
+
+    $default  reduce using rule 2 (lambda_program)
+
+
+State 10
+
+    4 lambda_stmt: TT_LET lambda_identifier TT_ASSIGN • lambda_expr TT_SEMI
+
+    TT_IDENTIFIER  shift, and go to state 5
+    TT_LAMBDA      shift, and go to state 11
+    TT_LPAREN      shift, and go to state 12
+
+    lambda_expr            go to state 13
+    lambda_expr_app        go to state 14
+    lambda_expr_singleton  go to state 15
+    lambda_identifier      go to state 16
+    lambda_token           go to state 7
+
+
+State 11
+
+    5 lambda_expr: TT_LAMBDA • lambda_identifier_list TT_ARROW lambda_expr
+
+    TT_IDENTIFIER  shift, and go to state 5
+
+    lambda_identifier_list  go to state 17
+    lambda_token            go to state 18
+
+
+State 12
+
+    9 lambda_expr_singleton: TT_LPAREN • lambda_expr TT_RPAREN
+
+    TT_IDENTIFIER  shift, and go to state 5
+    TT_LAMBDA      shift, and go to state 11
+    TT_LPAREN      shift, and go to state 12
+
+    lambda_expr            go to state 19
+    lambda_expr_app        go to state 14
+    lambda_expr_singleton  go to state 15
+    lambda_identifier      go to state 16
+    lambda_token           go to state 7
+
+
+State 13
+
+    4 lambda_stmt: TT_LET lambda_identifier TT_ASSIGN lambda_expr • TT_SEMI
+
+    TT_SEMI  shift, and go to state 20
+
+
+State 14
+
+    6 lambda_expr: lambda_expr_app •
+    8 lambda_expr_app: lambda_expr_app • lambda_expr_singleton
+
+    TT_IDENTIFIER  shift, and go to state 5
+    TT_LPAREN      shift, and go to state 12
+
+    $default  reduce using rule 6 (lambda_expr)
+
+    lambda_expr_singleton  go to state 21
+    lambda_identifier      go to state 16
+    lambda_token           go to state 7
+
+
+State 15
+
+    7 lambda_expr_app: lambda_expr_singleton •
+
+    $default  reduce using rule 7 (lambda_expr_app)
+
+
+State 16
+
+   10 lambda_expr_singleton: lambda_identifier •
+
+    $default  reduce using rule 10 (lambda_expr_singleton)
+
+
+State 17
+
+    5 lambda_expr: TT_LAMBDA lambda_identifier_list • TT_ARROW lambda_expr
+
+    TT_ARROW  shift, and go to state 22
+
+
+State 18
+
+   11 lambda_identifier_list: lambda_token • TT_COMMA lambda_identifier_list
+   12                       | lambda_token •
+
+    TT_COMMA  shift, and go to state 23
+
+    $default  reduce using rule 12 (lambda_identifier_list)
+
+
+State 19
+
+    9 lambda_expr_singleton: TT_LPAREN lambda_expr • TT_RPAREN
+
+    TT_RPAREN  shift, and go to state 24
+
+
+State 20
+
+    4 lambda_stmt: TT_LET lambda_identifier TT_ASSIGN lambda_expr TT_SEMI •
+
+    $default  reduce using rule 4 (lambda_stmt)
+
+
+State 21
+
+    8 lambda_expr_app: lambda_expr_app lambda_expr_singleton •
+
+    $default  reduce using rule 8 (lambda_expr_app)
+
+
+State 22
+
+    5 lambda_expr: TT_LAMBDA lambda_identifier_list TT_ARROW • lambda_expr
+
+    TT_IDENTIFIER  shift, and go to state 5
+    TT_LAMBDA      shift, and go to state 11
+    TT_LPAREN      shift, and go to state 12
+
+    lambda_expr            go to state 25
+    lambda_expr_app        go to state 14
+    lambda_expr_singleton  go to state 15
+    lambda_identifier      go to state 16
+    lambda_token           go to state 7
+
+
+State 23
+
+   11 lambda_identifier_list: lambda_token TT_COMMA • lambda_identifier_list
+
+    TT_IDENTIFIER  shift, and go to state 5
+
+    lambda_identifier_list  go to state 26
+    lambda_token            go to state 18
+
+
+State 24
+
+    9 lambda_expr_singleton: TT_LPAREN lambda_expr TT_RPAREN •
+
+    $default  reduce using rule 9 (lambda_expr_singleton)
+
+
+State 25
+
+    5 lambda_expr: TT_LAMBDA lambda_identifier_list TT_ARROW lambda_expr •
+
+    $default  reduce using rule 5 (lambda_expr)
+
+
+State 26
+
+   11 lambda_identifier_list: lambda_token TT_COMMA lambda_identifier_list •
+
+    $default  reduce using rule 11 (lambda_identifier_list)
