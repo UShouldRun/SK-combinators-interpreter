@@ -21,9 +21,80 @@ HashTable ast_check(AST* ast, size_t s_hashtable) {
     stack_clear(stack);
   }
 
+  stack_free(stack);
   return table;
 }
 
+void ast_print(AST* ast) {
+  assert(ast != NULL);
+  assert(ast->stmts != NULL);
+
+  IdentList* list = NULL;
+  for (ASTN_Stmt* stmt = ast->stmts; stmt != NULL; stmt = stmt->next) {
+    fprintf(stdout, "%s = \n", stmt->var->token->str);
+    list = _ident_list_append(list, stmt->expr->type != EXPR_APP || stmt->expr->fields.app.right == NULL);
+    _ast_expr_print(stmt->expr, 0, list);
+    _ident_list_free(list);
+    list = NULL;
+  }
+}
+
+void _ast_expr_print(ASTN_Expr* expr, size_t depth, IdentList* list) {
+  assert(expr != NULL);
+  
+  IdentList* node = list;
+  for (size_t i = 0; i < depth; i++, node = node->next)
+    printf("%s   ", node->value ? " " : "│");
+  
+  printf("%s ", node->value ? "└──" : "├──");
+  
+  switch (expr->type) {
+    case EXPR_APP: {
+      printf("Application\n");
+      
+      bool has_left = (expr->fields.app.left != NULL);
+      bool has_right = (expr->fields.app.right != NULL);
+      
+      if (has_left) {
+        list = _ident_list_append(list, !has_right);
+        _ast_expr_print(expr->fields.app.left, depth + 1, list);
+        (void)_ident_list_remove(&list);
+      }
+      
+      if (has_right) {
+        list = _ident_list_append(list, true);
+        _ast_expr_print(expr->fields.app.right, depth + 1, list);
+        (void)_ident_list_remove(&list);
+      }
+      
+      break;
+    }
+    case EXPR_ABS: {
+      printf("Abstraction (λ");
+      
+      ASTN_Ident* var = expr->fields.abs.vars;
+      while (var != NULL) {
+        printf(" %s", var->token->str);
+        var = var->next;
+        if (var != NULL)
+          printf(",");
+      }
+      printf(")\n");
+      
+      if (expr->fields.abs.expr != NULL) {
+        list = _ident_list_append(list, true);
+        _ast_expr_print(expr->fields.abs.expr, depth + 1, list);
+        (void)_ident_list_remove(&list);
+      }
+      
+      break;
+    }
+    case EXPR_IDENT: {
+      printf("Variable: %s\n", expr->fields.var->token->str);
+      break;
+    }
+  }
+}
 
 bool _ast_expr_check(ASTN_Expr* expr, HashTable* table, Stack** stack, const char* filename) {
   if (expr == NULL || table == NULL || stack == NULL)
@@ -36,7 +107,7 @@ bool _ast_expr_check(ASTN_Expr* expr, HashTable* table, Stack** stack, const cha
       if (!check) {
          fprintf(
           stderr,
-          "[CHECKER]: non declared identfier used %s in file %s at %u\n",
+          "[CHECKER]: non declared identifier used %s in file %s at %u\n",
           token->str, filename, token->frow
         );
         _error_underline(filename, token->frow, token->fcol, token->ecol);
@@ -72,6 +143,45 @@ bool _ast_expr_check(ASTN_Expr* expr, HashTable* table, Stack** stack, const cha
   return false;
 }
 
+IdentList* _ident_list_append(IdentList* list, bool value) {
+  IdentList* node = (IdentList*)malloc(sizeof(struct ident_list));
+  assert(node != NULL);
+  node->value = value;
+  node->next  = NULL;
+
+  if (list == NULL)
+    return node;
+
+  IdentList* n = list;
+  for (; n->next != NULL; n = n->next);
+  n->next = node;
+
+  return list;
+}
+
+bool _ident_list_remove(IdentList** list) {
+  assert(list != NULL);
+
+  IdentList** node = list;
+  for (; (*node)->next != NULL; node = &((*node)->next));
+
+  bool value = (*node)->value;
+  IdentList* delete = *node;
+
+  *node = NULL;
+  free(delete);
+
+  return value;
+}
+
+void _ident_list_free(IdentList* list) {
+  while (list != NULL) {
+    IdentList* delete = list;
+    list = list->next;
+    free(delete);
+  }
+}
+
 void _error_underline(const char* filename, const uint32_t frow, const uint32_t fcol, const uint32_t ecol) {
   assert(filename != NULL);
 
@@ -100,7 +210,7 @@ void _error_underline(const char* filename, const uint32_t frow, const uint32_t 
   fprintf(stderr, "%s%s", offset, "\033[31m");
 
   underline[0] = '^';
-  for (uint32_t i = 1; i < s_word; i++)
+  for (uint32_t i = 1; i <= s_word; i++)
     underline[i] = '~';
   underline[s_word] = '\0';
   fprintf(stderr, "%s%s\n", underline, "\033[0m");

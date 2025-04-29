@@ -170,7 +170,7 @@ void* hashmap_get(HashMap hashmap, char *key) {
   return NULL;
 }
 
-bool hashmap_remove(HashMap hashmap, char *key, void free_value(void *value)) {
+bool hashmap_remove(HashMap hashmap, char *key, void free_value(void *value), const bool to_free) {
   if (hashmap == NULL)
     return false;
   if (key == NULL)
@@ -180,9 +180,9 @@ bool hashmap_remove(HashMap hashmap, char *key, void free_value(void *value)) {
   HashMapNode head = &(hashmap->buckets[index]);
 
   while (head->key != NULL && strcmp(head->key, key) == 0) {
-    if (free_value) {
+    if (free_value && to_free) {
       free_value(head->value);
-    } else {
+    } else if (to_free) {
       free(head->value);
     }
     free(head->key);
@@ -207,9 +207,9 @@ bool hashmap_remove(HashMap hashmap, char *key, void free_value(void *value)) {
   HashMapNode delete = *current;
   *current = (*current)->next;
 
-  if (free_value) {
+  if (free_value && to_free) {
     free_value(delete->value);
-  } else {
+  } else if (to_free) {
     free(delete->value);
   }
   free(delete->key);
@@ -219,7 +219,7 @@ bool hashmap_remove(HashMap hashmap, char *key, void free_value(void *value)) {
   return true;
 }
 
-bool hashmap_free(HashMap hashmap, void free_value(void *value)) {
+bool hashmap_free(HashMap hashmap, void free_value(void *value), const bool to_free) {
   if (hashmap == NULL)
     return false;
   for (uint64_t i = 0; i < hashmap->s_buckets; i++) {
@@ -227,7 +227,7 @@ bool hashmap_free(HashMap hashmap, void free_value(void *value)) {
       continue;
 
     free(hashmap->buckets[i].key);
-    if (hashmap->buckets[i].value) {
+    if (hashmap->buckets[i].value && to_free) {
       if (free_value)
         free_value(hashmap->buckets[i].value);
       else
@@ -238,9 +238,9 @@ bool hashmap_free(HashMap hashmap, void free_value(void *value)) {
     while (current != NULL) {
       HashMapNode node = current;
       current = current->next;
-      if (free_value) {
+      if (free_value && to_free) {
         free_value(node->value);
-      } else {
+      } else if (to_free) {
         free(node->value);
       }
       free(node->key);

@@ -5,7 +5,8 @@
 #include "ast_priv.h"
 
 struct stack {
-  size_t s_stack, top;
+  size_t s_stack;
+  int64_t top;
   ASTN_Token* array[];
 };
 

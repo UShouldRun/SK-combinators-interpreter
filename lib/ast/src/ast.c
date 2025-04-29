@@ -13,7 +13,8 @@ AST* ast_create(Arena arena, const char* filename, ASTN_Stmt* stmts) {
   assert(ast != NULL);
 
   size_t s_stmts = 0;
-  for (size_t i = 0; stmts != NULL; stmts = stmts->next, i++);
+  ASTN_Stmt* stmt = stmts;
+  for (; stmt != NULL; stmt = stmt->next, s_stmts++);
 
   *ast = (AST){
     .filename = filename,

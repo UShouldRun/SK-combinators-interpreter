@@ -15,8 +15,7 @@ else
     $(error Invalid BUILD_TYPE: $(BUILD_TYPE). Use 'release' or 'debug')
 endif
 
-# Common flags - removed -Werror to allow compilation to continue despite warnings
-CFLAGS += -fno-strict-aliasing -Wformat -Wformat-security -D_GNU_SOURCE
+CFLAGS += -Werror -fno-strict-aliasing -Wformat -Wformat-security -D_GNU_SOURCE
 LDFLAGS := -Wl,-z,relro,-z,now
 YFLAGS := -d -v -Wcounterexamples -locations
 
@@ -90,7 +89,8 @@ endif
 all: directories $(TARGET)
 
 # Build rule - build with default flags
-build: directories $(TARGET)
+build:
+	@$(MAKE) BUILD_TYPE=debug
 
 # Rule to create build directories
 directories:
@@ -136,7 +136,7 @@ $(PARSER_LIB): $(PARSER_OBJ)
 # Rules for hashmap library (external)
 $(HASHMAP_LIB):
 	@echo "Producing hashmap library in $(BUILD_TYPE) mode"
-	@$(MAKE) -C $(HASHMAP_DIR)
+	@$(MAKE) $(BUILD_TYPE) -C $(HASHMAP_DIR)
 	@echo "HashMap Library compiled successfully in $(BUILD_TYPE) mode"
 
 # Rules for generating lexer and parser code

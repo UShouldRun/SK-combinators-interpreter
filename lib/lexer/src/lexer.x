@@ -21,7 +21,7 @@ int32_t current_column = 1;
 alpha      [_a-zA-Z]
 digit      [0-9]
 
-id         {alpha}({alpha}|digit)*
+id         {alpha}({alpha}|{digit})*
 
 whitespace [ \t\r]+
 comment    ("//".*\n|"/*"([^*]|\*+[^*/])*\*+"/")

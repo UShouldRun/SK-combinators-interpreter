@@ -54,14 +54,17 @@ void yyerror(YYLTYPE* yylloc, const char* error_msg);
 
 lambda:
     lambda_program
-    { ast = ast_create(arena, filename, $1); }
+    { 
+      assert($1 != NULL);
+      ast = ast_create(arena, filename, $1); 
+    }
   ;
 
 lambda_program:
     lambda_stmt lambda_program
     { $$ = astn_add_stmt($1, $2); }
   | lambda_stmt
-    { $$ = astn_add_stmt($1, NULL); }
+    { $$ = $1; }
   ;
 
 lambda_stmt:
@@ -111,7 +114,7 @@ lambda_token:
 void yyerror(YYLTYPE* yylloc, const char* error_msg) {
   assert(yylloc != NULL);
 
-  fprintf(stderr, "[PARSER]: %s in file %s at %u", error_msg, filename, yylloc->first_line);
+  fprintf(stderr, "[PARSER]: %s in file %s at %u\n", error_msg, filename, yylloc->first_line);
   FILE* file = fopen(filename, "r");
   if (file == NULL) {
     fprintf(stderr, "Error: Could not access or find the source file: %s\n", filename);
@@ -130,7 +133,7 @@ void yyerror(YYLTYPE* yylloc, const char* error_msg) {
     fprintf(stderr, " ");
   fprintf(stderr, "%s^", "\033[31m");
   int32_t s_word = yylloc->last_column - yylloc->first_column + 1;
-  for (int32_t i = 1; i < s_word; i++)
+  for (int32_t i = 1; i <= s_word; i++)
     fprintf(stderr, "~");
   fprintf(stderr, "%s\n", "\033[0m");
 }

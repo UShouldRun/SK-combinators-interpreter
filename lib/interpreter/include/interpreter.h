@@ -10,5 +10,6 @@
 #include "hashtable.h"
 
 HashTable ast_check (AST*, size_t);
+void      ast_print (AST*);
 
 #endif // !INTERPRETER_H

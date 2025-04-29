@@ -19,7 +19,7 @@ void*    hashmap_get    (HashMap hashmap, char* key);
 
 bool     hashmap_exists (HashMap hashmap, char* key);
 bool     hashmap_insert (HashMap* hashmap, char* key, void* value, void free_value(void* value));
-bool     hashmap_remove (HashMap hashmap, char* key, void free_value(void* value));
-bool     hashmap_free   (HashMap hashmap, void free_value(void* value));
+bool     hashmap_remove (HashMap hashmap, char* key, void free_value(void* value), const bool);
+bool     hashmap_free   (HashMap hashmap, void free_value(void* value), const bool);
 
 #endif

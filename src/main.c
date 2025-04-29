@@ -70,6 +70,8 @@ int32_t main(int32_t argc, char* argv[]) {
     fprintf(stdout, "Successfully checked AST\n");
   }
 
+  ast_print(ast);
+
   hashtable_free(table);
   arena_destroy(arena);
   yylex_destroy();
