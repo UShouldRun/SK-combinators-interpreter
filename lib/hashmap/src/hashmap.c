@@ -39,7 +39,7 @@ bool hashmap_exists(HashMap hashmap, char *key) {
   return false;
 }
 
-bool hashmap_insert(HashMap *hashmap, char *key, void *value, void free_value(void* value)) {
+bool hashmap_insert(HashMap *hashmap, char *key, void *value, void free_value(void* value), const bool to_free) {
   if (hashmap == NULL)
     return false;
   if (*hashmap == NULL)
@@ -62,9 +62,9 @@ bool hashmap_insert(HashMap *hashmap, char *key, void *value, void free_value(vo
   } 
 
   if (strcmp(head->key, key) == 0) {
-    if (free_value) {
+    if (free_value && to_free) {
       free_value(head->value);
-    } else {
+    } else if (to_free) {
       free(head->value);
     }
     head->value = value;
@@ -96,22 +96,24 @@ bool hashmap_insert(HashMap *hashmap, char *key, void *value, void free_value(vo
   if (!hashmap_near_capacity(*hashmap))
     return true;
 
-  uint64_t new_s_buckets = 2 * (*hashmap)->s_buckets;
-  assert(new_s_buckets > (*hashmap)->s_buckets);
-  HashMap temp = (HashMap)realloc(
-    *hashmap,
-    sizeof(struct hashmap) + new_s_buckets * sizeof(struct hashmap_node)
-  );
+  uint64_t old_s_buckets = (*hashmap)->s_buckets;
+  uint64_t new_s_buckets = 2 * old_s_buckets;
+  assert(new_s_buckets > old_s_buckets);
+  HashMap temp = (HashMap)calloc(1, sizeof(struct hashmap) + new_s_buckets * sizeof(struct hashmap_node));
   assert(temp != NULL);
-  temp->s_buckets = new_s_buckets;
+  temp->s_buckets  = new_s_buckets;
+  temp->s_elements = (*hashmap)->s_elements;
 
-  for (uint64_t i = 0; i < (*hashmap)->s_buckets; i++) {
+  for (uint64_t i = 0; i < old_s_buckets; i++) {
+    head = &((*hashmap)->buckets[i]);
+    if (head->key == NULL)
+      continue;
+
     HashMapNode bucket = &(temp->buckets[hash(head->key, temp->s_buckets)]);
-    head = &((*hashmap)->buckets[i]); // defined above
 
     if (bucket->key != NULL) {
       HashMapNode *bucket_curr = &(bucket->next);
-      for (; *bucket_curr != NULL; *bucket_curr = (*bucket_curr)->next);
+      for (; *bucket_curr != NULL; bucket_curr = &((*bucket_curr)->next));
 
       HashMapNode node = (HashMapNode)calloc(1, sizeof(struct hashmap_node));
       assert(node != NULL);
@@ -128,24 +130,27 @@ bool hashmap_insert(HashMap *hashmap, char *key, void *value, void free_value(vo
 
     HashMapNode curr = head->next;
     while (curr != NULL) {
-      curr = curr->next;
       HashMapNode node = curr;
+      curr = curr->next;
 
       bucket = &((*hashmap)->buckets[hash(node->key, temp->s_buckets)]);
       if (bucket->key == NULL) {
         bucket->key   = node->key;
         bucket->value = node->value;
+        bucket->next  = NULL;
         free(node);
         continue;
       }
 
       HashMapNode *bucket_curr = &(bucket->next);
-      for (; *bucket_curr != NULL; *bucket_curr = (*bucket_curr)->next);
+      for (; *bucket_curr != NULL; bucket_curr = &((*bucket_curr)->next));
+      node->next = NULL;
       *bucket_curr = node;
     }
   }
 
-  (*hashmap) = temp;
+  free(*hashmap);
+  *hashmap = temp;
   return true;
 }
 

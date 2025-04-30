@@ -15,7 +15,7 @@ bool hashtable_exists(HashTable table, ASTN_Token* token) {
 }
 
 bool hashtable_insert(HashTable* table, ASTN_Stmt* stmt) {
-  return hashmap_insert(table, (char*)stmt->var->token->str, (void*)stmt, NULL);
+  return hashmap_insert(table, (char*)stmt->var->token->str, (void*)stmt, NULL, false);
 }
 
 bool hashtable_free(HashTable table) {
@@ -97,7 +97,7 @@ bool stack_exists(Stack* stack, ASTN_Token* token) {
 
   int64_t i = 0;
   ASTN_Token* curr = stack->array[stack->top];
-  while (stack->top - i >= 0) {
+  while (stack->top - i >= 0 && curr != NULL) {
     if (strcmp(token->str, curr->str) == 0)
       return true;
     curr = stack->array[stack->top - ++i];

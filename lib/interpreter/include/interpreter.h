@@ -9,7 +9,10 @@
 
 #include "hashtable.h"
 
-HashTable ast_check (AST*, size_t);
-void      ast_print (AST*);
+// ========================# PUBLIC #========================
+
+HashTable ast_check     (AST*, size_t);
+void      ast_print     (AST*);
+void      ast_transform (Arena, AST*);
 
 #endif // !INTERPRETER_H

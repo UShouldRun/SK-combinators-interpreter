@@ -1,5 +1,7 @@
 #include "interpreter_priv.h"
 
+// ========================# PUBLIC #========================
+
 HashTable ast_check(AST* ast, size_t s_hashtable) {
   if (ast == NULL)
     return NULL;
@@ -31,7 +33,7 @@ void ast_print(AST* ast) {
 
   IdentList* list = NULL;
   for (ASTN_Stmt* stmt = ast->stmts; stmt != NULL; stmt = stmt->next) {
-    fprintf(stdout, "%s = \n", stmt->var->token->str);
+    fprintf(stdout, "%s\n", stmt->var->token->str);
     list = _ident_list_append(list, stmt->expr->type != EXPR_APP || stmt->expr->fields.app.right == NULL);
     _ast_expr_print(stmt->expr, 0, list);
     _ident_list_free(list);
@@ -39,62 +41,13 @@ void ast_print(AST* ast) {
   }
 }
 
-void _ast_expr_print(ASTN_Expr* expr, size_t depth, IdentList* list) {
-  assert(expr != NULL);
-  
-  IdentList* node = list;
-  for (size_t i = 0; i < depth; i++, node = node->next)
-    printf("%s   ", node->value ? " " : "│");
-  
-  printf("%s ", node->value ? "└──" : "├──");
-  
-  switch (expr->type) {
-    case EXPR_APP: {
-      printf("Application\n");
-      
-      bool has_left = (expr->fields.app.left != NULL);
-      bool has_right = (expr->fields.app.right != NULL);
-      
-      if (has_left) {
-        list = _ident_list_append(list, !has_right);
-        _ast_expr_print(expr->fields.app.left, depth + 1, list);
-        (void)_ident_list_remove(&list);
-      }
-      
-      if (has_right) {
-        list = _ident_list_append(list, true);
-        _ast_expr_print(expr->fields.app.right, depth + 1, list);
-        (void)_ident_list_remove(&list);
-      }
-      
-      break;
-    }
-    case EXPR_ABS: {
-      printf("Abstraction (λ");
-      
-      ASTN_Ident* var = expr->fields.abs.vars;
-      while (var != NULL) {
-        printf(" %s", var->token->str);
-        var = var->next;
-        if (var != NULL)
-          printf(",");
-      }
-      printf(")\n");
-      
-      if (expr->fields.abs.expr != NULL) {
-        list = _ident_list_append(list, true);
-        _ast_expr_print(expr->fields.abs.expr, depth + 1, list);
-        (void)_ident_list_remove(&list);
-      }
-      
-      break;
-    }
-    case EXPR_IDENT: {
-      printf("Variable: %s\n", expr->fields.var->token->str);
-      break;
-    }
-  }
+void ast_transform(Arena arena, AST* ast) {
+  assert(arena != NULL && ast != NULL);
+  for (ASTN_Stmt* stmt = ast->stmts; stmt != NULL; stmt = stmt->next)
+    _ast_expr_transform(arena, stmt->expr);
 }
+
+// ========================# PRIVATE #========================
 
 bool _ast_expr_check(ASTN_Expr* expr, HashTable* table, Stack** stack, const char* filename) {
   if (expr == NULL || table == NULL || stack == NULL)
@@ -141,6 +94,86 @@ bool _ast_expr_check(ASTN_Expr* expr, HashTable* table, Stack** stack, const cha
   }
 
   return false;
+}
+
+void _ast_expr_print(ASTN_Expr* expr, size_t depth, IdentList* list) {
+  assert(expr != NULL);
+  
+  IdentList* node = list;
+  for (size_t i = 0; i < depth; i++, node = node->next)
+    printf("%s   ", node->value ? " " : "│");
+  
+  printf("%s ", node->value ? "└──" : "├──");
+  
+  switch (expr->type) {
+    case EXPR_APP: {
+      printf("@\n");
+      
+      list = _ident_list_append(list, false);
+      _ast_expr_print(expr->fields.app.left, depth + 1, list);
+      (void)_ident_list_remove(&list);
+      
+      list = _ident_list_append(list, true);
+      _ast_expr_print(expr->fields.app.right, depth + 1, list);
+      (void)_ident_list_remove(&list);
+      
+      break;
+    }
+    case EXPR_ABS: {
+      printf("λ");
+      
+      ASTN_Ident* var = expr->fields.abs.vars;
+      while (var != NULL) {
+        printf("%s", var->token->str);
+        var = var->next;
+        if (var != NULL)
+          printf(",");
+      }
+      printf("\n");
+      
+      list = _ident_list_append(list, true);
+      _ast_expr_print(expr->fields.abs.expr, depth + 1, list);
+      (void)_ident_list_remove(&list);
+      
+      break;
+    }
+    case EXPR_IDENT: {
+      printf("%s\n", expr->fields.var->token->str);
+      break;
+    }
+  }
+}
+
+void _ast_expr_transform(Arena arena, ASTN_Expr* expr) {
+  assert(arena != NULL && expr != NULL);  
+
+  switch (expr->type) {
+    case EXPR_APP: {
+      _ast_expr_transform(arena, expr->fields.app.left);
+      _ast_expr_transform(arena, expr->fields.app.right);
+      break;
+    }
+    case EXPR_ABS: {
+      ASTN_Ident* var = expr->fields.abs.vars->next;
+      expr->fields.abs.vars->next = NULL;
+
+      while (var != NULL) {
+        ASTN_Ident* temp = var->next;
+        var->next = NULL;
+
+        expr->fields.abs.expr = astn_create_expr_abs(
+          arena, var, expr->fields.abs.expr,
+          var->frow, var->fcol, var->erow, var->ecol
+        );
+        
+        var = temp;
+      }
+
+      _ast_expr_transform(arena, expr->fields.abs.expr);
+      break;
+    }
+    case EXPR_IDENT: {}
+  }
 }
 
 IdentList* _ident_list_append(IdentList* list, bool value) {
