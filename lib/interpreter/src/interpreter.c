@@ -34,7 +34,7 @@ void ast_print(AST* ast) {
   IdentList* list = NULL;
   for (ASTN_Stmt* stmt = ast->stmts; stmt != NULL; stmt = stmt->next) {
     fprintf(stdout, "%s\n", stmt->var->token->str);
-    list = _ident_list_append(list, stmt->expr->type != EXPR_APP || stmt->expr->fields.app.right == NULL);
+    list = _ident_list_append(list, true);
     _ast_expr_print(stmt->expr, 0, list);
     _ident_list_free(list);
     list = NULL;
@@ -45,6 +45,27 @@ void ast_transform(Arena arena, AST* ast) {
   assert(arena != NULL && ast != NULL);
   for (ASTN_Stmt* stmt = ast->stmts; stmt != NULL; stmt = stmt->next)
     _ast_expr_transform(arena, stmt->expr);
+}
+
+SK_Tree* ast_convert(AST* ast, HashTable table) {
+  assert(ast != NULL && table != NULL);
+
+  size_t s_stmts = ast->s_stmts;
+  SK_Tree* roots = (SK_Tree*)malloc(s_stmts * sizeof(struct sk_tree));
+  assert(roots != NULL);
+
+  for (size_t i = 0; i < s_stmts; i++)
+    roots[i] = _ast_convert_expr(ast->stmts[i], table);
+
+  return roots;
+}
+
+SK_Tree* skt_beta_redu(SK_Tree* root) {
+  return NULL;
+}
+
+void skt_print(SK_Tree* root) {
+
 }
 
 // ========================# PRIVATE #========================

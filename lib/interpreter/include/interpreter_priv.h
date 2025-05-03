@@ -11,6 +11,11 @@ typedef struct ident_list {
   struct ident_list* next;
 } IdentList;
 
+struct sk_tree {
+  enum { S_NODE, K_NODE, APP_NODE } type;
+  struct sk_tree* left, right;
+};
+
 IdentList* _ident_list_append   (IdentList*, bool);
 bool       _ident_list_remove   (IdentList**);
 void       _ident_list_free     (IdentList*);

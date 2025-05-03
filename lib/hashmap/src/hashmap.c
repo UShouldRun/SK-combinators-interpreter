@@ -97,7 +97,7 @@ bool hashmap_insert(HashMap *hashmap, char *key, void *value, void free_value(vo
     return true;
 
   uint64_t old_s_buckets = (*hashmap)->s_buckets;
-  uint64_t new_s_buckets = 2 * old_s_buckets;
+  uint64_t new_s_buckets = old_s_buckets << 1;
   assert(new_s_buckets > old_s_buckets);
   HashMap temp = (HashMap)calloc(1, sizeof(struct hashmap) + new_s_buckets * sizeof(struct hashmap_node));
   assert(temp != NULL);
@@ -133,7 +133,7 @@ bool hashmap_insert(HashMap *hashmap, char *key, void *value, void free_value(vo
       HashMapNode node = curr;
       curr = curr->next;
 
-      bucket = &((*hashmap)->buckets[hash(node->key, temp->s_buckets)]);
+      bucket = &(temp->buckets[hash(node->key, temp->s_buckets)]);
       if (bucket->key == NULL) {
         bucket->key   = node->key;
         bucket->value = node->value;
