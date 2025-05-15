@@ -3,6 +3,11 @@
 
 #include "hashtable.h"
 
+struct sk_tree {
+  enum { S_NODE, K_NODE, APP_NODE, REF_NODE } type;
+  struct sk_tree* left, right;
+};
+
 struct ast {
   size_t      s_stmts;
   ASTN_Stmt*  stmts;
@@ -14,6 +19,7 @@ struct astn_stmt {
   ASTN_Ident* var;
   ASTN_Expr*  expr;
   ASTN_Stmt*  next;
+  struct sk_tree* sk_expr;
 };
 
 struct astn_expr {

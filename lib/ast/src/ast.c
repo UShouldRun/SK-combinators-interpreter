@@ -42,13 +42,14 @@ ASTN_Stmt* astn_create_stmt(
   assert(stmt != NULL);
 
   *stmt = (ASTN_Stmt){
-    .frow = frow,
-    .fcol = fcol,
-    .erow = erow,
-    .ecol = ecol,
-    .var  = var,
-    .expr = expr,
-    .next = NULL
+    .frow    = frow,
+    .fcol    = fcol,
+    .erow    = erow,
+    .ecol    = ecol,
+    .var     = var,
+    .expr    = expr,
+    .sk_expr = NULL,
+    .next    = NULL
   };
   return stmt;
 }

@@ -11,18 +11,17 @@ typedef struct ident_list {
   struct ident_list* next;
 } IdentList;
 
-struct sk_tree {
-  enum { S_NODE, K_NODE, APP_NODE } type;
-  struct sk_tree* left, right;
-};
+IdentList* _ident_list_append    (IdentList*, bool);
+bool       _ident_list_remove    (IdentList**);
+void       _ident_list_free      (IdentList*);
 
-IdentList* _ident_list_append   (IdentList*, bool);
-bool       _ident_list_remove   (IdentList**);
-void       _ident_list_free     (IdentList*);
+bool        _ast_expr_check      (ASTN_Expr*, HashTable*, Stack**, const char*);
+void        _ast_expr_print      (ASTN_Expr*, size_t, IdentList*);
+void        _ast_expr_transform  (Arena, ASTN_Expr*);
+SK_Tree*    _ast_expr_convert    (ASTN_Expr*, HashTable, const char*);
 
-bool        _ast_expr_check     (ASTN_Expr*, HashTable*, Stack**, const char*);
-void        _ast_expr_print     (ASTN_Expr*, size_t, IdentList*);
-void        _ast_expr_transform (Arena, ASTN_Expr*);
-void        _error_underline    (const char*, const uint32_t, const uint32_t, const uint32_t);
+bool        _ast_in_free_var_set (ASTN_Expr*, ASTN_Ident*);
+
+void        _error_underline     (const char*, const uint32_t, const uint32_t, const uint32_t);
 
 #endif // !INTERPRETER_PRIV_H
