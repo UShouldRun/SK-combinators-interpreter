@@ -47,25 +47,40 @@ void ast_transform(Arena arena, AST* ast) {
     _ast_expr_transform(arena, stmt->expr);
 }
 
-SK_Tree* ast_convert(AST* ast, HashTable table, const char* filename) {
-  assert(ast != NULL && table != NULL);
+SK_Tree** ast_convert(Arena arena, AST* ast, HashTable table) {
+  assert(arena != NULL && ast != NULL && table != NULL);
 
   size_t s_stmts = ast->s_stmts;
-  SK_Tree* roots = (SK_Tree*)malloc(s_stmts * sizeof(struct sk_tree));
+  SK_Tree** roots = (SK_Tree**)arena_alloc(arena, s_stmts * sizeof(SK_Tree*));
   assert(roots != NULL);
 
-  for (size_t i = 0; i < s_stmts; i++)
-    roots[i] = _ast_expr_convert(ast->stmts[i].expr, table, ast->filename);
+  ASTN_Stmt* stmt = ast->stmts;
+  for (size_t i = 0; i < s_stmts; i++, stmt = stmt->next) {
+    roots[i] = _ast_expr_convert(arena, stmt->expr, table, ast->filename);
+    roots[i]->ld_ident = stmt->var;
+    stmt->sk_expr = roots[i];
+  }
 
   return roots;
 }
 
 SK_Tree* skt_beta_redu(SK_Tree* root) {
-  return NULL;
+  if (root == NULL)
+    return NULL;
+  return root;
 }
 
-void skt_print(SK_Tree* root) {
+void skt_print(SK_Tree** roots, size_t s_roots) {
+  assert(roots != NULL);
 
+  IdentList* list = NULL;
+  for (size_t i = 0; i < s_roots; i++) {
+    fprintf(stdout, "%s\n", roots[i]->ld_ident->token->str);
+    list = _ident_list_append(list, true);
+    _sk_print_expr(roots[i], 0, list);
+    _ident_list_free(list);
+    list = NULL;
+  }
 }
 
 // ========================# PRIVATE #========================
@@ -175,19 +190,20 @@ void _ast_expr_transform(Arena arena, ASTN_Expr* expr) {
       break;
     }
     case EXPR_ABS: {
-      ASTN_Ident* var = expr->fields.abs.vars->next;
-      expr->fields.abs.vars->next = NULL;
+      ASTN_Ident* var = expr->fields.abs.vars;
+      ASTN_Expr** sub_expr = &(expr->fields.abs.expr);
 
-      while (var != NULL) {
-        ASTN_Ident* temp = var->next;
+      while (var->next != NULL) {
+        ASTN_Ident* next = var->next;
         var->next = NULL;
 
-        expr->fields.abs.expr = astn_create_expr_abs(
-          arena, var, expr->fields.abs.expr,
+        *sub_expr = astn_create_expr_abs(
+          arena, next, *sub_expr,
           var->frow, var->fcol, var->erow, var->ecol
         );
         
-        var = temp;
+        var = next;
+        sub_expr = &((*sub_expr)->fields.abs.expr);
       }
 
       _ast_expr_transform(arena, expr->fields.abs.expr);
@@ -197,18 +213,18 @@ void _ast_expr_transform(Arena arena, ASTN_Expr* expr) {
   }
 }
 
-SK_Tree* _ast_expr_convert(ASTN_Expr* expr, HashTable table, const char* filename) {
-  assert(expr != NULL && table != NULL);
+SK_Tree* _ast_expr_convert(Arena arena, ASTN_Expr* expr, HashTable table, const char* filename) {
+  assert(arena != NULL && expr != NULL && table != NULL);
 
   switch (expr->type) {
     case EXPR_APP: {
-      SK_Tree* app = (SK_Tree*)malloc(sizeof(struct sk_tree));
+      SK_Tree* app = (SK_Tree*)arena_alloc(arena, sizeof(struct sk_tree));
       assert(app != NULL);
 
       *app = (SK_Tree){
         .type  = APP_NODE,
-        .left  = _ast_expr_convert(expr->fields.app.left, table, filename),
-        .right = _ast_expr_convert(expr->fields.app.right, table, filename)
+        .left  = _ast_expr_convert(arena, expr->fields.app.left, table, filename),
+        .right = _ast_expr_convert(arena, expr->fields.app.right, table, filename)
       };
 
       return app;
@@ -218,103 +234,363 @@ SK_Tree* _ast_expr_convert(ASTN_Expr* expr, HashTable table, const char* filenam
 
       if (expr->fields.abs.expr->type != EXPR_APP) {
         if (expr->fields.abs.expr->type == EXPR_IDENT) {
-          if (strcmp(expr->fields.abs->expr->fields.var->token->str, var->token->str) == 0) {
-            SK_Tree* app1, app2, s, k1, k2;
-            app1 = (SK_Tree*)malloc(sizeof(struct sk_tree));
-            app2 = (SK_Tree*)malloc(sizeof(struct sk_tree));
-            s    = (SK_Tree*)malloc(sizeof(struct sk_tree));
-            k1   = (SK_Tree*)malloc(sizeof(struct sk_tree));
-            k2   = (SK_Tree*)malloc(sizeof(struct sk_tree));
+          if (strcmp(expr->fields.abs.expr->fields.var->token->str, var->token->str) == 0) {
+            SK_Tree* app1, *app2, *s, *k1, *k2;
+            app1 = (SK_Tree*)arena_alloc(arena, sizeof(struct sk_tree));
+            app2 = (SK_Tree*)arena_alloc(arena, sizeof(struct sk_tree));
+            s    = (SK_Tree*)arena_alloc(arena, sizeof(struct sk_tree));
+            k1   = (SK_Tree*)arena_alloc(arena, sizeof(struct sk_tree));
+            k2   = (SK_Tree*)arena_alloc(arena, sizeof(struct sk_tree));
             assert(app1 != NULL && app2 != NULL && s != NULL && k1 != NULL && k2 != NULL);
 
-            *s  = (SK_Tree){ .type = S_NODE, .left = .right = NULL };
-            *k2 = (SK_Tree){ .type = K_NODE, .left = .right = NULL };
-            *k1 = (SK_Tree){ .type = K_NODE, .left = .right = NULL };
+            *s  = (SK_Tree){ .type = S_NODE, .left = NULL, .right = NULL, .ld_ident = NULL };
+            *k2 = (SK_Tree){ .type = K_NODE, .left = NULL, .right = NULL, .ld_ident = NULL };
+            *k1 = (SK_Tree){ .type = K_NODE, .left = NULL, .right = NULL, .ld_ident = NULL };
 
-            *app2 = (SK_Tree){ .type = APP_NODE, .left = s, .right = k2 };
-            *app1 = (SK_Tree){ .type = APP_NODE, .left = app2, .right = k1 };
+            *app2 = (SK_Tree){ .type = APP_NODE, .left = s, .right = k2, .ld_ident = NULL };
+            *app1 = (SK_Tree){ .type = APP_NODE, .left = app2, .right = k1, .ld_ident = NULL };
 
             return app1;
           }
 
-          ASTN_Stmt* stmt = hashtable_lookup(table, var->token);
-          assert(stmt != NULL);
+          SK_Tree* k = (SK_Tree*)arena_alloc(arena, sizeof(struct sk_tree));
+          assert(k != NULL);
 
-          if (stmt->sk_expr == NULL) {
-            fprintf(
-              stderr,
-              "[SK CONVERTER]: sub expression was not defined previously to the current statement %s at line %d in file %s. Maybe you declared it later?\n",
-              var->token->str,
-              var->frow,
-              filename
-            );
-            _error_underline(filename, var->frow, var->fcol, var->ecol);
+          ASTN_Stmt* stmt = hashtable_lookup(table, var->token);
+          if (stmt != NULL) {
+            if (stmt->sk_expr == NULL) {
+              fprintf(
+                stderr,
+                "[SK CONVERTER]: sub expression was not defined previously to the current statement %s at line %d in file %s. Maybe you declared it later?\n",
+                expr->fields.var->token->str,
+                expr->fields.var->frow,
+                filename
+              );
+              _error_underline(filename, expr->fields.var->frow, expr->fields.var->fcol, expr->fields.var->ecol);
+            }
+
+            SK_Tree* app = (SK_Tree*)arena_alloc(arena, sizeof(struct sk_tree));
+            assert(app != NULL);
+
+            SK_Tree* ref = (SK_Tree*)arena_alloc(arena, sizeof(struct sk_tree));
+            assert(ref != NULL);
+            *ref = (SK_Tree){ .type = REF_NODE, .left = stmt->sk_expr, .right = NULL, .ld_ident = stmt->var };
+
+            *app = (SK_Tree){ .type = APP_NODE, .left = k, .right = ref, .ld_ident = NULL };
+
+            return app;
           }
 
-          SK_Tree* ref = (SK_Tree*)malloc(sizeof(struct sk_tree));
-          assert(ref != NULL);
-          *ref = (SK_Tree){ .type = REF_NODE, .left = stmt->sk_tree, .right = NULL };
-
-          return ref;
+          *k = (SK_Tree){ .type = K_NODE, .left = NULL, .right = NULL, .ld_ident = NULL };
+          return k;
         }
 
+        SK_Tree* sub_expr = _ast_expr_convert(arena, expr->fields.abs.expr, table, filename);
         if (!_ast_in_free_var_set(expr->fields.abs.expr, var)) {
-          SK_Tree* k = (SK_Tree*)malloc(sizeof(struct sk_tree));
-          assert(k != NULL);
-          *k = (SK_Tree){
-            .type = K_NODE,
-            .left = .right = NULL,
-          };
-
-          SK_Tree* app = (SK_Tree*)malloc(sizeof(struct sk_tree));
+          SK_Tree* app = (SK_Tree*)arena_alloc(arena, sizeof(struct sk_tree));
           assert(app != NULL);
+
+          SK_Tree* k = (SK_Tree*)arena_alloc(arena, sizeof(struct sk_tree));
+          assert(k != NULL);
+
+          *k = (SK_Tree){ .type = K_NODE, .left = NULL, .right = NULL, .ld_ident = NULL };
+
           *app = (SK_Tree){
             .type  = APP_NODE,
             .left  = k,
-            .right = _ast_expr_convert(expr->fields.abs.expr, table, filename);
+            .right = sub_expr,
+            .ld_ident = NULL
           };
 
           return app;
         }
 
-        SK_Tree* app1 = (SK_Tree*)malloc(sizeof(struct sk_tree));
-        assert(app1 != NULL);
+        return _ast_expr_convert_sk(arena, sub_expr, expr->fields.abs.vars);
+      }
 
-        SK_Tree* app2 = (SK_Tree*)malloc(sizeof(struct sk_tree));
-        assert(app2 != NULL);
+      bool var_free_left  = _ast_in_free_var_set(expr->fields.abs.expr->fields.app.left, var);
+      bool var_free_right = _ast_in_free_var_set(expr->fields.abs.expr->fields.app.right, var);
 
-        SK_Tree* s = (SK_Tree*)malloc(sizeof(struct sk_tree));
-        assert(s != NULL);
+      if (!var_free_left && !var_free_right) {
+        SK_Tree* k = (SK_Tree*)arena_alloc(arena, sizeof(struct sk_tree));
+        assert(k != NULL);
+        *k = (SK_Tree){
+          .type  = K_NODE,
+          .left  = NULL,
+          .right = NULL,
+          .ld_ident = NULL
+        };
 
-        bool var_free_left  = _ast_in_free_var_set(expr->fields.abs.expr->fields.app.left, var);
-        bool var_free_right = _ast_in_free_var_set(expr->fields.abs.expr->fields.app.right, var);
+        SK_Tree* app = (SK_Tree*)arena_alloc(arena, sizeof(struct sk_tree));
+        assert(app != NULL);
+        *app = (SK_Tree){
+          .type  = APP_NODE,
+          .left  = k,
+          .right = _ast_expr_convert(arena, expr->fields.abs.expr, table, filename),
+          .ld_ident = NULL
+        };
 
-        if (!var_free_left) {
-          SK_Tree* k = (SK_Tree*)malloc(sizeof(struct sk_tree));
-          assert(k != NULL);
-          *k = (SK_Tree){
-            .type = K_NODE,
-            .left = .right = NULL,
-          };
+        return app;
+      }
 
-          SK_Tree* app3 = (SK_Tree*)malloc(sizeof(struct sk_tree));
-          assert(app3 != NULL);
-          *app3 = (SK_Tree){
-            .type  = APP_NODE,
-            .left  = k,
-            .right = _ast_expr_convert(expr->fields.abs.expr->fiels.app.left, table, filename);
-          };
+      if (var_free_right && expr->fields.abs.expr->fields.app.right->type == EXPR_IDENT)
+        return _ast_expr_convert(arena, expr->fields.abs.expr->fields.app.left, table, filename);
 
-          *app2 = (SK_Tree){
-            .type  = APP_NODE,
-            .left  = s,
-            .right = app3
-          };
+      SK_Tree* app1 = (SK_Tree*)arena_alloc(arena, sizeof(struct sk_tree));
+      assert(app1 != NULL);
+
+      SK_Tree* app2 = (SK_Tree*)arena_alloc(arena, sizeof(struct sk_tree));
+      assert(app2 != NULL);
+
+      SK_Tree* s = (SK_Tree*)arena_alloc(arena, sizeof(struct sk_tree));
+      assert(s != NULL);
+
+      if (!var_free_left) {
+        SK_Tree* k = (SK_Tree*)arena_alloc(arena, sizeof(struct sk_tree));
+        assert(k != NULL);
+        *k = (SK_Tree){
+          .type  = K_NODE,
+          .left  = NULL,
+          .right = NULL,
+          .ld_ident = NULL
+        };
+
+        SK_Tree* app3 = (SK_Tree*)arena_alloc(arena, sizeof(struct sk_tree));
+        assert(app3 != NULL);
+        *app3 = (SK_Tree){
+          .type  = APP_NODE,
+          .left  = k,
+          .right = _ast_expr_convert(arena, expr->fields.abs.expr->fields.app.left, table, filename),
+          .ld_ident = NULL
+        };
+
+        *app2 = (SK_Tree){
+          .type  = APP_NODE,
+          .left  = s,
+          .right = app3,
+          .ld_ident = NULL
+        };
+      } else {
+        ASTN_Expr* sub_expr = astn_copy_expr(expr->fields.abs.expr->fields.app.left);
+        assert(sub_expr != NULL);
+
+        ASTN_Expr* left = (ASTN_Expr*)malloc(sizeof(struct astn_expr));
+        assert(left != NULL);
+        *left = (ASTN_Expr){
+          .frow = expr->frow,
+          .fcol = expr->fcol,
+          .erow = expr->erow,
+          .ecol = expr->ecol,
+          .type = EXPR_ABS,
+          .fields.abs.vars = astn_copy_ident(expr->fields.abs.vars),
+          .fields.abs.expr = sub_expr
+        };
+
+        *app2 = (SK_Tree){
+          .type  = APP_NODE,
+          .left  = s,
+          .right = _ast_expr_convert(arena, left, table, filename),
+          .ld_ident = NULL
+        };
+
+        astn_free_expr(left);
+      }
+
+      if (!var_free_right) {
+        SK_Tree* k = (SK_Tree*)arena_alloc(arena, sizeof(struct sk_tree));
+        assert(k != NULL);
+        *k = (SK_Tree){
+          .type  = K_NODE,
+          .left  = NULL,
+          .right = NULL,
+          .ld_ident = NULL
+        };
+
+        SK_Tree* app3 = (SK_Tree*)arena_alloc(arena, sizeof(struct sk_tree));
+        assert(app3 != NULL);
+        *app3 = (SK_Tree){
+          .type  = APP_NODE,
+          .left  = k,
+          .right = _ast_expr_convert(arena, expr->fields.abs.expr->fields.app.right, table, filename),
+          .ld_ident = NULL
+        };
+
+        *app1 = (SK_Tree){
+          .type  = APP_NODE,
+          .left  = app2,
+          .right = app3,
+          .ld_ident = NULL
+        };
+      } else {
+        ASTN_Expr* sub_expr = astn_copy_expr(expr->fields.abs.expr->fields.app.right);
+        assert(sub_expr != NULL);
+
+        ASTN_Expr* right = (ASTN_Expr*)malloc(sizeof(struct astn_expr));
+        assert(right != NULL);
+        *right = (ASTN_Expr){
+          .frow = expr->frow,
+          .fcol = expr->fcol,
+          .erow = expr->erow,
+          .ecol = expr->ecol,
+          .type = EXPR_ABS,
+          .fields.abs.vars = astn_copy_ident(expr->fields.abs.vars),
+          .fields.abs.expr = sub_expr
+        };
+
+        *app1 = (SK_Tree){
+          .type  = APP_NODE,
+          .left  = app2,
+          .right = _ast_expr_convert(arena, right, table, filename),
+          .ld_ident = NULL
+        };
+
+        astn_free_expr(right);
+      }
+
+      return app1;
+    }
+    case EXPR_IDENT: {
+      ASTN_Stmt* stmt = hashtable_lookup(table, expr->fields.var->token);
+
+      if (stmt != NULL) {
+        if (stmt->sk_expr == NULL) {
+          fprintf(
+            stderr,
+            "[SK CONVERTER]: sub expression was not defined previously to the current statement %s at line %d in file %s. Maybe you declared it later?\n",
+            expr->fields.var->token->str,
+            expr->fields.var->frow,
+            filename
+          );
+          _error_underline(filename, expr->fields.var->frow, expr->fields.var->fcol, expr->fields.var->ecol);
         }
 
-        // Continue from HERE. NOTE: I'LL PROBABLY NEED TO INTRODUCE A ASTN_Ident* CONTEXT FOR FREE VARIABLE CONVERTION
-        // THIS CASE: S (\T x -> P) (\T x -> Q)
+        SK_Tree* ref = (SK_Tree*)arena_alloc(arena, sizeof(struct sk_tree));
+        assert(ref != NULL);
+        *ref = (SK_Tree){ .type = REF_NODE, .left = stmt->sk_expr, .right = NULL, .ld_ident = stmt->var };
+
+        return ref;
       }
+
+      SK_Tree* wrapper = (SK_Tree*)arena_alloc(arena, sizeof(struct sk_tree));
+      assert(wrapper != NULL);
+
+      *wrapper = (SK_Tree){ .type = LD_NODE, .ld_ident = expr->fields.var, .left = NULL, .right = NULL };
+
+      return wrapper;
+    }
+}
+
+  fprintf(stderr, "[SK CONVERTER]: converter function reached its end. Something went wrong!\n");
+  exit(1);
+  return NULL;
+}
+
+SK_Tree* _ast_expr_convert_sk(Arena arena, SK_Tree* expr, ASTN_Ident* var) {
+  assert(arena != NULL && expr != NULL && var != NULL);
+
+  switch (expr->type) {
+    case APP_NODE: {
+      bool 
+        var_free_left  = _ast_in_free_var_set_sk(expr->left, var),
+        var_free_right = _ast_in_free_var_set_sk(expr->right, var)
+      ;
+
+      if (!var_free_left && var_free_right && expr->right->type == LD_NODE)
+        return expr->left;
+
+      SK_Tree* s = (SK_Tree*)arena_alloc(arena, sizeof(struct sk_tree));
+      assert(s != NULL);
+
+      SK_Tree* app2 = (SK_Tree*)arena_alloc(arena, sizeof(struct sk_tree));
+      assert(app2 != NULL);
+
+      SK_Tree* app1 = (SK_Tree*)arena_alloc(arena, sizeof(struct sk_tree));
+      assert(app1 != NULL);
+
+      if (!var_free_left) {
+        SK_Tree* k = (SK_Tree*)arena_alloc(arena, sizeof(struct sk_tree));
+        assert(k != NULL);
+
+        SK_Tree* app3 = (SK_Tree*)arena_alloc(arena, sizeof(struct sk_tree));
+        assert(app3 != NULL);
+
+        *k = (SK_Tree){ .type = K_NODE, .left = NULL, .right = NULL, .ld_ident = NULL };
+
+        *app3 = (SK_Tree){
+          .type  = APP_NODE,
+          .left  = k,
+          .right = expr->left,
+          .ld_ident = NULL
+        };
+
+        *app2 = (SK_Tree){
+          .type  = APP_NODE,
+          .left  = s,
+          .right = app3,
+          .ld_ident = NULL
+        };
+      } else {
+        *app2 = (SK_Tree){
+          .type  = APP_NODE,
+          .left  = s,
+          .right = _ast_expr_convert_sk(arena, expr->left, var),
+          .ld_ident = NULL
+        };
+      }
+
+      if (!var_free_right) {
+        SK_Tree* k = (SK_Tree*)arena_alloc(arena, sizeof(struct sk_tree));
+        assert(k != NULL);
+
+        SK_Tree* app3 = (SK_Tree*)arena_alloc(arena, sizeof(struct sk_tree));
+        assert(app3 != NULL);
+
+        *k = (SK_Tree){ .type = K_NODE, .left = NULL, .right = NULL, .ld_ident = NULL };
+
+        *app3 = (SK_Tree){
+          .type  = APP_NODE,
+          .left  = k,
+          .right = expr->right,
+          .ld_ident = NULL
+        };
+
+        *app1 = (SK_Tree){
+          .type  = APP_NODE,
+          .left  = app2,
+          .right = app3,
+          .ld_ident = NULL
+        };
+      } else {
+        *app1 = (SK_Tree){
+          .type  = APP_NODE,
+          .left  = app2,
+          .right = _ast_expr_convert_sk(arena, expr->right, var),
+          .ld_ident = NULL
+        };
+      }
+
+      return app1;
+    }
+    case LD_NODE: {
+      if (strcmp(expr->ld_ident->token->str, var->token->str) == 0) {
+        SK_Tree* app2, *s, *k1, *k2;
+        app2 = (SK_Tree*)arena_alloc(arena, sizeof(struct sk_tree));
+        s    = (SK_Tree*)arena_alloc(arena, sizeof(struct sk_tree));
+        k1   = (SK_Tree*)arena_alloc(arena, sizeof(struct sk_tree));
+        k2   = (SK_Tree*)arena_alloc(arena, sizeof(struct sk_tree));
+        assert(app2 != NULL && s != NULL && k1 != NULL && k2 != NULL);
+
+        *s  = (SK_Tree){ .type = S_NODE, .left = NULL, .right = NULL, .ld_ident = NULL };
+        *k2 = (SK_Tree){ .type = K_NODE, .left = NULL, .right = NULL, .ld_ident = NULL };
+        *k1 = (SK_Tree){ .type = K_NODE, .left = NULL, .right = NULL, .ld_ident = NULL };
+
+        *app2 = (SK_Tree){ .type = APP_NODE, .left = s, .right = k2, .ld_ident = NULL };
+        *expr = (SK_Tree){ .type = APP_NODE, .left = app2, .right = k1, .ld_ident = NULL };
+      }
+      return expr;
+    }
+    default: {
+      return expr;
     }
   }
 }
@@ -335,6 +611,72 @@ bool _ast_in_free_var_set(ASTN_Expr* expr, ASTN_Ident* var) {
     }
     case EXPR_IDENT: {
       return strcmp(expr->fields.var->token->str, var->token->str) == 0;
+    }
+  }
+
+  fprintf(stderr, "[SK CONVERTER]: free var set function reached its end. Something went wrong!\n");
+  exit(1);
+  return false;
+}
+
+bool _ast_in_free_var_set_sk(SK_Tree* expr, ASTN_Ident* var) {
+  if (expr == NULL || var == NULL)
+    return false;
+
+  switch (expr->type) {
+    case APP_NODE: { 
+      return (
+           _ast_in_free_var_set_sk(expr->left, var)
+        || _ast_in_free_var_set_sk(expr->right, var)
+      );
+    }
+    case LD_NODE: {
+      return strcmp(expr->ld_ident->token->str, var->token->str) == 0;
+    }
+    default: {
+      return false;
+    }
+  }
+}
+
+void _sk_print_expr(SK_Tree* expr, size_t depth, IdentList* list) {
+  assert(expr != NULL);
+  
+  IdentList* node = list;
+  for (size_t i = 0; i < depth; i++, node = node->next)
+    printf("%s   ", node->value ? " " : "│");
+  
+  printf("%s ", node->value ? "└──" : "├──");
+  
+  switch (expr->type) {
+    case APP_NODE: {
+      printf("@\n");
+      
+      list = _ident_list_append(list, false);
+      _sk_print_expr(expr->left, depth + 1, list);
+      (void)_ident_list_remove(&list);
+      
+      list = _ident_list_append(list, true);
+      _sk_print_expr(expr->right, depth + 1, list);
+      (void)_ident_list_remove(&list);
+      
+      break;
+    }
+    case REF_NODE: {
+      printf("&%s\n", expr->left->ld_ident->token->str);
+      break;
+    }
+    case LD_NODE: {
+      printf("%s\n", expr->ld_ident->token->str);
+      break;
+    }
+    case K_NODE: {
+      printf("K\n");
+      break;
+    }
+    case S_NODE: {
+      printf("S\n");
+      break;
     }
   }
 }

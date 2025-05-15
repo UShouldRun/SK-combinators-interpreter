@@ -73,6 +73,11 @@ int32_t main(int32_t argc, char* argv[]) {
   ast_transform(arena, ast);
   ast_print(ast);
 
+  size_t s_roots = ast->s_stmts;
+  SK_Tree** roots = ast_convert(arena, ast, table);
+
+  skt_print(roots, s_roots);
+
   hashtable_free(table);
   arena_destroy(arena);
   yylex_destroy();

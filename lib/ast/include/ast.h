@@ -28,4 +28,12 @@ ASTN_Ident* astn_create_ident      (Arena, ASTN_Token*, ASTN_Ident*);
 
 ASTN_Token* astn_create_token      (Arena, const char*, const uint32_t, const uint32_t, const uint32_t);
 
+ASTN_Expr*  astn_copy_expr         (ASTN_Expr*);
+ASTN_Ident* astn_copy_ident        (ASTN_Ident*);
+ASTN_Token* astn_copy_token        (ASTN_Token*);
+
+void        astn_free_expr         (ASTN_Expr*);
+void        astn_free_ident        (ASTN_Ident*);
+void        astn_free_token        (ASTN_Token*);
+
 #endif // !AST_H

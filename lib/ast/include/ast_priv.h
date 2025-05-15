@@ -1,11 +1,13 @@
 #ifndef AST_PRIV_H
 #define AST_PRIV_H
 
+#include "ast.h"
 #include "hashtable.h"
 
 struct sk_tree {
-  enum { S_NODE, K_NODE, APP_NODE, REF_NODE } type;
-  struct sk_tree* left, right;
+  enum { S_NODE, K_NODE, APP_NODE, REF_NODE, LD_NODE } type;
+  struct sk_tree* left, *right;
+  ASTN_Ident* ld_ident;
 };
 
 struct ast {
