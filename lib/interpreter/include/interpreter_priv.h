@@ -25,6 +25,7 @@ SK_Tree*    _ast_expr_convert_sk    (Arena, SK_Tree*, ASTN_Ident*);
 
 void        _sk_print_expr          (SK_Tree*, size_t, IdentList*);
 SK_Tree*    _skt_get_leftmost       (SK_Tree*, size_t*);
+void        _sk_write_expr          (FILE*, SK_Tree*);
 
 bool        _ast_in_free_var_set    (ASTN_Expr*, ASTN_Ident*);
 bool        _ast_in_free_var_set_sk (SK_Tree*, ASTN_Ident*);

@@ -230,7 +230,7 @@ ASTN_Token* astn_copy_token(Arena arena, ASTN_Token* token) {
     .frow = token->frow,
     .fcol = token->fcol,
     .ecol = token->ecol,
-    .str  = strdup(token->str)
+    .str  = arena_strdup(arena, (char*)token->str)
   };
 
   return copy;

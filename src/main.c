@@ -78,6 +78,16 @@ int32_t main(int32_t argc, char* argv[]) {
 
   skt_print(roots, s_roots);
 
+  size_t s_outfilename = s_filename + 3;
+  char* outfilename = strdup(filename);
+  outfilename = strncat(outfilename, ".sk", s_outfilename);
+  
+  FILE* outfile = fopen(outfilename, "w");
+  skt_write(outfile, roots, s_roots);
+
+  fclose(outfile);
+  free(outfilename);
+
   hashtable_free(table);
   arena_destroy(arena);
   yylex_destroy();
