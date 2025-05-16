@@ -56,7 +56,10 @@ SK_Tree** ast_convert(Arena arena, AST* ast, HashTable table) {
 
   ASTN_Stmt* stmt = ast->stmts;
   for (size_t i = 0; i < s_stmts; i++, stmt = stmt->next) {
-    roots[i] = _ast_expr_convert(arena, stmt->expr, table, ast->filename);
+    roots[i] = skt_beta_redu(
+      arena,
+      _ast_expr_convert(arena, stmt->expr, table, ast->filename)
+    );
     roots[i]->ld_ident = stmt->var;
     stmt->sk_expr = roots[i];
   }
@@ -64,10 +67,49 @@ SK_Tree** ast_convert(Arena arena, AST* ast, HashTable table) {
   return roots;
 }
 
-SK_Tree* skt_beta_redu(SK_Tree* root) {
+SK_Tree* skt_beta_redu(Arena arena, SK_Tree* root) {
   if (root == NULL)
     return NULL;
-  return root;
+
+  SK_Tree* expr = root;
+  size_t i = 0;
+  for (; i < MAX_BETA_REDUCTIONS; i++) {
+    size_t depth = 0;
+    SK_Tree* leftmost = _skt_get_leftmost(expr, &depth);
+    assert(leftmost != NULL);
+
+    if (leftmost->type == K_NODE && depth == 2) {
+      expr = expr->left->right;
+      continue;
+
+    } else if (leftmost->type == S_NODE && depth == 3) {
+      expr->left->left->left  = expr->left->left->right;
+
+      SK_Tree* ref = (SK_Tree*)arena_alloc(arena, sizeof(struct sk_tree));
+      assert(ref != NULL);
+      *ref = (SK_Tree){ .type = REF_NODE, .left = expr->right, .right = NULL, .ld_ident = NULL };
+
+      expr->left->left->right = expr->right;
+
+      SK_Tree* temp = expr->left;
+      expr->left = expr->left->left;
+      temp->left = temp->right;
+      temp->right = ref;
+      expr->right = temp;
+      continue;
+
+    } else if (leftmost->type == REF_NODE) {
+      SK_Tree* sub_expr = expr;
+      for (size_t j = 0; j < depth - 1; sub_expr = sub_expr->left, j++);
+      sub_expr->left = skt_copy(arena, leftmost->left);
+      assert(sub_expr->left != NULL);
+      continue;
+    }
+
+    break;
+  }
+
+  return expr;
 }
 
 void skt_print(SK_Tree** roots, size_t s_roots) {
@@ -81,6 +123,64 @@ void skt_print(SK_Tree** roots, size_t s_roots) {
     _ident_list_free(list);
     list = NULL;
   }
+}
+
+SK_Tree* skt_copy(Arena arena, SK_Tree* expr) {
+  if (arena == NULL || expr == NULL)
+    return NULL;
+
+  switch (expr->type) {
+    case APP_NODE: {
+      SK_Tree* app = (SK_Tree*)arena_alloc(arena, sizeof(struct sk_tree));
+      assert(app != NULL);
+
+      *app = (SK_Tree){
+        .type  = APP_NODE,
+        .left  = skt_copy(arena, expr->left),
+        .right = skt_copy(arena, expr->right),
+        .ld_ident = NULL
+      };
+      return app;
+    }
+    case REF_NODE: {
+      SK_Tree* ref = (SK_Tree*)arena_alloc(arena, sizeof(struct sk_tree));
+      assert(ref != NULL);
+
+      *ref = (SK_Tree){
+        .type  = REF_NODE,
+        .left  = expr->left,
+        .right = NULL,
+        .ld_ident = NULL
+      };
+      return ref;
+    }
+    case LD_NODE: {
+      SK_Tree* ld_node = (SK_Tree*)arena_alloc(arena, sizeof(struct sk_tree));
+      assert(ld_node != NULL);
+
+      *ld_node = (SK_Tree){
+        .type  = LD_NODE,
+        .left  = NULL,
+        .right = NULL,
+        .ld_ident = astn_copy_ident(arena, expr->ld_ident)
+      };
+      return ld_node;
+    }
+    case S_NODE: {
+      SK_Tree* s = (SK_Tree*)arena_alloc(arena, sizeof(struct sk_tree));
+      assert(s != NULL);
+      *s = (SK_Tree){ .type = S_NODE, .left = NULL, .right = NULL, .ld_ident = NULL };
+      return s;
+    }
+    case K_NODE: {
+      SK_Tree* k = (SK_Tree*)arena_alloc(arena, sizeof(struct sk_tree));
+      assert(k != NULL);
+      *k = (SK_Tree){ .type = K_NODE, .left = NULL, .right = NULL, .ld_ident = NULL };
+      return k;
+    }
+  }
+
+  return NULL;
 }
 
 // ========================# PRIVATE #========================
@@ -371,7 +471,7 @@ SK_Tree* _ast_expr_convert(Arena arena, ASTN_Expr* expr, HashTable table, const 
           .ld_ident = NULL
         };
       } else {
-        ASTN_Expr* sub_expr = astn_copy_expr(expr->fields.abs.expr->fields.app.left);
+        ASTN_Expr* sub_expr = astn_copy_expr(arena, expr->fields.abs.expr->fields.app.left);
         assert(sub_expr != NULL);
 
         ASTN_Expr* left = (ASTN_Expr*)malloc(sizeof(struct astn_expr));
@@ -382,7 +482,7 @@ SK_Tree* _ast_expr_convert(Arena arena, ASTN_Expr* expr, HashTable table, const 
           .erow = expr->erow,
           .ecol = expr->ecol,
           .type = EXPR_ABS,
-          .fields.abs.vars = astn_copy_ident(expr->fields.abs.vars),
+          .fields.abs.vars = astn_copy_ident(arena, expr->fields.abs.vars),
           .fields.abs.expr = sub_expr
         };
 
@@ -392,8 +492,6 @@ SK_Tree* _ast_expr_convert(Arena arena, ASTN_Expr* expr, HashTable table, const 
           .right = _ast_expr_convert(arena, left, table, filename),
           .ld_ident = NULL
         };
-
-        astn_free_expr(left);
       }
 
       if (!var_free_right) {
@@ -422,7 +520,7 @@ SK_Tree* _ast_expr_convert(Arena arena, ASTN_Expr* expr, HashTable table, const 
           .ld_ident = NULL
         };
       } else {
-        ASTN_Expr* sub_expr = astn_copy_expr(expr->fields.abs.expr->fields.app.right);
+        ASTN_Expr* sub_expr = astn_copy_expr(arena, expr->fields.abs.expr->fields.app.right);
         assert(sub_expr != NULL);
 
         ASTN_Expr* right = (ASTN_Expr*)malloc(sizeof(struct astn_expr));
@@ -433,7 +531,7 @@ SK_Tree* _ast_expr_convert(Arena arena, ASTN_Expr* expr, HashTable table, const 
           .erow = expr->erow,
           .ecol = expr->ecol,
           .type = EXPR_ABS,
-          .fields.abs.vars = astn_copy_ident(expr->fields.abs.vars),
+          .fields.abs.vars = astn_copy_ident(arena, expr->fields.abs.vars),
           .fields.abs.expr = sub_expr
         };
 
@@ -443,8 +541,6 @@ SK_Tree* _ast_expr_convert(Arena arena, ASTN_Expr* expr, HashTable table, const 
           .right = _ast_expr_convert(arena, right, table, filename),
           .ld_ident = NULL
         };
-
-        astn_free_expr(right);
       }
 
       return app1;
@@ -663,7 +759,7 @@ void _sk_print_expr(SK_Tree* expr, size_t depth, IdentList* list) {
       break;
     }
     case REF_NODE: {
-      printf("&%s\n", expr->left->ld_ident->token->str);
+      printf("&%s\n", expr->ld_ident != NULL ? expr->ld_ident->token->str : "");
       break;
     }
     case LD_NODE: {
@@ -679,6 +775,17 @@ void _sk_print_expr(SK_Tree* expr, size_t depth, IdentList* list) {
       break;
     }
   }
+}
+
+SK_Tree* _skt_get_leftmost(SK_Tree* expr, size_t* depth) {
+  if (expr == NULL || depth == NULL)
+    return NULL;
+  *depth = 0;
+  while (expr->type == APP_NODE) {
+    expr = expr->left;
+    (*depth)++;
+  }
+  return expr;
 }
 
 IdentList* _ident_list_append(IdentList* list, bool value) {

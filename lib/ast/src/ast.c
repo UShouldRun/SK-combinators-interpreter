@@ -152,11 +152,11 @@ ASTN_Token* astn_create_token(Arena arena, const char* str, const uint32_t frow,
   return token;
 }
 
-ASTN_Expr* astn_copy_expr(ASTN_Expr* expr) {
+ASTN_Expr* astn_copy_expr(Arena arena, ASTN_Expr* expr) {
   if (expr == NULL)
     return NULL;
 
-  ASTN_Expr* copy = (ASTN_Expr*)malloc(sizeof(struct astn_expr));
+  ASTN_Expr* copy = (ASTN_Expr*)arena_alloc(arena, sizeof(struct astn_expr));
   assert(copy != NULL);
 
   switch (expr->type) {
@@ -167,8 +167,8 @@ ASTN_Expr* astn_copy_expr(ASTN_Expr* expr) {
         .erow = expr->erow,
         .ecol = expr->ecol,
         .type = EXPR_APP,
-        .fields.app.left  = astn_copy_expr(expr->fields.app.left),
-        .fields.app.right = astn_copy_expr(expr->fields.app.right)
+        .fields.app.left  = astn_copy_expr(arena, expr->fields.app.left),
+        .fields.app.right = astn_copy_expr(arena, expr->fields.app.right)
       };
       break;
     }
@@ -179,8 +179,8 @@ ASTN_Expr* astn_copy_expr(ASTN_Expr* expr) {
         .erow = expr->erow,
         .ecol = expr->ecol,
         .type = EXPR_ABS,
-        .fields.abs.vars = astn_copy_ident(expr->fields.abs.vars),
-        .fields.abs.expr = astn_copy_expr(expr->fields.abs.expr)
+        .fields.abs.vars = astn_copy_ident(arena, expr->fields.abs.vars),
+        .fields.abs.expr = astn_copy_expr(arena, expr->fields.abs.expr)
       };
       break;
     }
@@ -191,7 +191,7 @@ ASTN_Expr* astn_copy_expr(ASTN_Expr* expr) {
         .erow = expr->erow,
         .ecol = expr->ecol,
         .type = EXPR_IDENT,
-        .fields.var = astn_copy_ident(expr->fields.var),
+        .fields.var = astn_copy_ident(arena, expr->fields.var),
       };
       break;
     }
@@ -200,11 +200,11 @@ ASTN_Expr* astn_copy_expr(ASTN_Expr* expr) {
   return copy;
 }
 
-ASTN_Ident* astn_copy_ident(ASTN_Ident* var) {
+ASTN_Ident* astn_copy_ident(Arena arena, ASTN_Ident* var) {
   if (var == NULL)
     return NULL;
 
-  ASTN_Ident* copy = (ASTN_Ident*)malloc(sizeof(struct astn_id));
+  ASTN_Ident* copy = (ASTN_Ident*)arena_alloc(arena, sizeof(struct astn_id));
   assert(copy != NULL);
 
   *copy = (ASTN_Ident){
@@ -213,18 +213,18 @@ ASTN_Ident* astn_copy_ident(ASTN_Ident* var) {
     .erow  = var->erow,
     .ecol  = var->ecol,
     .s_id  = var->s_id,
-    .token = astn_copy_token(var->token),
-    .next  = astn_copy_ident(var->next)
+    .token = astn_copy_token(arena, var->token),
+    .next  = astn_copy_ident(arena, var->next)
   };
 
   return copy;
 }
 
-ASTN_Token* astn_copy_token(ASTN_Token* token) {
+ASTN_Token* astn_copy_token(Arena arena, ASTN_Token* token) {
   if (token == NULL)
     return NULL;
 
-  ASTN_Token* copy = (ASTN_Token*)malloc(sizeof(struct astn_token));
+  ASTN_Token* copy = (ASTN_Token*)arena_alloc(arena, sizeof(struct astn_token));
   assert(copy != NULL);
   *copy = (ASTN_Token){
     .frow = token->frow,
@@ -234,45 +234,4 @@ ASTN_Token* astn_copy_token(ASTN_Token* token) {
   };
 
   return copy;
-}
-
-void astn_free_expr(ASTN_Expr* expr) {
-  if (expr == NULL)
-    return;
-
-  switch (expr->type) {
-    case EXPR_APP: {
-      astn_free_expr(expr->fields.app.left);
-      astn_free_expr(expr->fields.app.right);
-      free(expr);
-      return;
-    }
-    case EXPR_ABS: {
-      astn_free_ident(expr->fields.abs.vars);
-      astn_free_expr(expr->fields.abs.expr);
-      free(expr);
-      return;
-    }
-    case EXPR_IDENT: {
-      astn_free_ident(expr->fields.var);
-      free(expr);
-      return;
-    }
-  }
-}
-
-void astn_free_ident(ASTN_Ident* var) {
-  while (var != NULL) {
-    ASTN_Ident* temp = var;
-    var = var->next;
-    astn_free_token(temp->token);
-    free(temp);
-  }
-}
-
-void astn_free_token(ASTN_Token* token) {
-  if (token == NULL)
-    return;
-  free((void*)token->str);
-  free(token);
 }

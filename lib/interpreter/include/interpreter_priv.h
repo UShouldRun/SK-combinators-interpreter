@@ -6,6 +6,8 @@
 
 // ========================# PRIVATE #========================
 
+#define MAX_BETA_REDUCTIONS 500
+
 typedef struct ident_list {
   bool value;
   struct ident_list* next;
@@ -20,7 +22,9 @@ void        _ast_expr_print         (ASTN_Expr*, size_t, IdentList*);
 void        _ast_expr_transform     (Arena, ASTN_Expr*);
 SK_Tree*    _ast_expr_convert       (Arena, ASTN_Expr*, HashTable, const char*);
 SK_Tree*    _ast_expr_convert_sk    (Arena, SK_Tree*, ASTN_Ident*);
+
 void        _sk_print_expr          (SK_Tree*, size_t, IdentList*);
+SK_Tree*    _skt_get_leftmost       (SK_Tree*, size_t*);
 
 bool        _ast_in_free_var_set    (ASTN_Expr*, ASTN_Ident*);
 bool        _ast_in_free_var_set_sk (SK_Tree*, ASTN_Ident*);
