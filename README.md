@@ -9,11 +9,8 @@ This interpreter implements the SK combinator calculus, a variant of combinatory
 ## Features
 
 - Parsing and interpreting of SK expressions
-- Step-by-step reduction visualization
+- Step-by-step reduction visualization (needs to be modified in the beta reduction function to be seen)
 - Support for custom combinators and extensions
-- Command line interface for interactive evaluation
-- File-based execution for batch processing
-- Debug mode for tracing expression evaluation
 
 ## Installation
 
@@ -25,27 +22,13 @@ make install
 ## Usage
 
 ```
-interpreter [options] [file]
+interpreter [file]
 ```
 
-### Options
-
-- `-v, --verbose`: Show detailed reduction steps
-- `-h, --help`: Display help information
-- `-d, --debug`: Run in debug mode
-- `-i, --interactive`: Start interactive REPL mode
-
-### Examples
+### Example
 
 ```
-# Evaluate a file
 interpreter example.ld
-
-# Interactive mode
-interpreter -i
-
-# Show reduction steps
-interpreter -v example.ld
 ```
 
 ## Syntax

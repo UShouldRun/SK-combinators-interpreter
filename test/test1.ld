@@ -29,4 +29,7 @@ let two = \f -> \x -> f (f x);
 let three = suc two;
 let four = suc three;
 
+let v = square three;
+let u = v f x;
+let w = square four;
 let var = add (square three) (square four);

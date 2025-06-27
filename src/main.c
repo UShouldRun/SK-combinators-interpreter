@@ -78,9 +78,10 @@ int32_t main(int32_t argc, char* argv[]) {
 
   skt_print(roots, s_roots);
 
-  size_t s_outfilename = s_filename + 3;
+  size_t s_outfilename = s_filename;
   char* outfilename = strdup(filename);
-  outfilename = strncat(outfilename, ".sk", s_outfilename);
+  outfilename[s_outfilename - 2] = 's';
+  outfilename[s_outfilename - 1] = 'k';
   
   FILE* outfile = fopen(outfilename, "w");
   skt_write(outfile, roots, s_roots);
